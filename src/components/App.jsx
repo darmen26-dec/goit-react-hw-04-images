@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Notify } from 'notiflix';
 import Searchbar from './Searchbar/Searchbar';
 import { ImageGallery } from './ImageGallery/ImageGallery';
@@ -8,87 +8,77 @@ import Modal from './Modal/Modal';
 import { getItems } from './PixabayApi';
 import css from './App.module.css';
 
-class App extends Component {
-  state = {
-    images: [],
-    query: '',
-    page: 1,
-    isLoading: false,
-    showBtn: false,
-    showModal: false,
-    largeImageURL: '',
-  };
+const App = () => {
+  const [images, setImages] = useState([]);
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showBtn, setShowBtn] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [largeImageURL, setLargeImageURL] = useState('');
+  const [error, setError] = useState(null);
 
-  componentDidUpdate(prevProps, prevState) {
-    if (
-      this.state.query !== prevState.query ||
-      this.state.page !== prevState.page
-    ) {
-      this.fetchGallery(this.state.query, this.state.page);
-    }
-  }
-
-  onSubmit = query => {
-    this.setState({
-      query,
-      isLoading: true,
-      images: [],
-      page: 1,
-    });
-  };
-
-  nextPage = () => {
-    const { page } = this.state;
-
-    this.setState({
-      page: page + 1,
-      isLoading: true,
-    });
-  };
-
-  openImageModal = url => {
-    this.setState({ showModal: true, largeImageURL: url });
-  };
-
-  closeModal = () => {
-    this.setState({ showModal: false, largeImageURL: '' });
-  };
-
-  fetchGallery = (query, page) => {
+  const fetchGallery = useCallback(() => {
     getItems(query, page)
       .then(response => {
-        this.setState(prevState => ({
-          images: [...prevState.images, ...response],
-          showBtn: response.length === 12,
-        }));
+        setImages(prevImages => [...prevImages, ...response]);
+        setShowBtn(response.length === 12);
 
         if (response.length === 0) {
           Notify.failure('No matches found!');
         }
       })
       .catch(error => {
-        this.setState({ error });
+        setError(error);
       })
       .finally(() => {
-        this.setState({ isLoading: false });
+        setIsLoading(false);
       });
+  }, [query, page]);
+
+  useEffect(() => {
+    if (query !== '' || page !== 1) {
+      setIsLoading(true);
+      setImages([]);
+      setError(null);
+      fetchGallery();
+    }
+  }, [query, page, fetchGallery]);
+
+  const onSubmit = newQuery => {
+    setQuery(newQuery);
+    setIsLoading(true);
+    setImages([]);
+    setPage(1);
   };
 
-  render() {
-    const { images, isLoading, showBtn, showModal, largeImageURL } = this.state;
+  const nextPage = () => {
+    setPage(prevPage => prevPage + 1);
+    setIsLoading(true);
+  };
 
-    return (
-      <div className={css.App}>
-        <Searchbar getInputValue={this.onSubmit} />
-        <ImageGallery images={images} openImageModal={this.openImageModal} />
-        {isLoading && <Loader />}
-        {showBtn && <Button nextPage={this.nextPage} hasMoreImages={true} />}
-        {showModal && (
-          <Modal largeImageURL={largeImageURL} closeModal={this.closeModal} />
-        )}
-      </div>
-    );
-  }
-}
+  const openImageModal = url => {
+    setShowModal(true);
+    setLargeImageURL(url);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setLargeImageURL('');
+  };
+
+  return (
+    <div className={css.App}>
+      <Searchbar getInputValue={onSubmit} />
+      <ImageGallery images={images} openImageModal={openImageModal} />
+      {isLoading && <Loader />}
+      {showBtn && <Button nextPage={nextPage} hasMoreImages={true} />}
+      {showModal && (
+        <Modal largeImageURL={largeImageURL} closeModal={closeModal} />
+      )}
+      {error && <div>Error occurred: {error.message}</div>}
+    </div>
+  );
+};
 
 export default App;
