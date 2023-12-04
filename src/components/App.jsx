@@ -39,7 +39,6 @@ const App = () => {
   useEffect(() => {
     if (query !== '' || page !== 1) {
       setIsLoading(true);
-      setImages([]);
       setError(null);
       fetchGallery();
     }
